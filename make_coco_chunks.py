@@ -9,19 +9,16 @@ from pycocotools.coco import COCO
 from pycocoevalcap.eval import COCOEvalCap
 import requests
 
-from ..NeuralModels import convnet, preprocess_image
+import sys
+sys.path.insert(0, "../")
+from NeuralModels.convnets import convnet, preprocess_image_batch
 
-#Create the CNN, using the 19 layers CNN
-# vgg_deploy_path = 'VGG_ILSVRC_19_layers_deploy.prototxt'
-# vgg_model_path  = 'VGG_ILSVRC_19_layers.caffemodel'
-# cnn = CNN(deploy=vgg_deploy_path,
-#           model=vgg_model_path,
-#           batch_size=20,
-#           width=224,
-#           height=224)
+import pdb
+
+
 
 cnn, feature_layer = convnet('vgg_19',
-                             weight_path='/mnt/data/lblier/vgg19_weights.h5',
+                             weights_path='/mnt/data/lblier/vgg19_weights.h5',
                              output_layers=['conv5_4'])
 
 
@@ -130,6 +127,7 @@ def processImgList(theList,basefn):
 
     for start, end in zip(range(0, len(theList)+batch_size, batch_size),
                           range(batch_size, len(theList)+batch_size, batch_size)):
+        
         print("processing images %d to %d" % (start, end))
         image_files = [getFilename(x) for x in theList[start:end]]
         # feat = cnn.get_features(image_list=image_files,
@@ -137,12 +135,14 @@ def processImgList(theList,basefn):
         #                         layer_sizes=[512,14,14])
 
 
-        imgs = [preprocess_image(x, 224, 224) for x in image_files]
-        feat = feature_layer(imgs)
+        imgs = preprocess_image_batch(image_files, 224, 224)
+        feat = feature_layer([imgs])
         if numPics % batch_size == 0: #reset!
             featStacks = scipy.sparse.csr_matrix(np.array(map(lambda x: x.flatten(), feat)))
         else:
-            featStacks = scipy.sparse.vstack([featStacks, scipy.sparse.csr_matrix(np.array(map(lambda x: x.flatten(), feat)))],format="csr")
+            featStacks = scipy.sparse.vstack([featStacks,
+                                              scipy.sparse.csr_matrix(np.array(map(lambda x: x.flatten(), feat)))],
+                                             format="csr")
         
         numPics += 1
 
@@ -161,16 +161,16 @@ def processImgList(theList,basefn):
 
 
 print('train now')
-train_feats = processImgList(trainImgs,'./data/coco_align.train')
+train_feats = processImgList(trainImgs,'/mnt/data/lblier/coco/processed/coco_align.train')
 with open('./data/coco_align.train.pkl', 'wb') as f:
     cPickle.dump(cap_train, f,protocol=cPickle.HIGHEST_PROTOCOL)
 
 print('val now')
-val_feats = processImgList(valImgs,'./data/coco_align.val')
+val_feats = processImgList(valImgs,'/mnt/data/lblier/coco/processed/coco_align.val')
 with open('./data/coco_align.val.pkl', 'wb') as f:
     cPickle.dump(cap_val, f,protocol=cPickle.HIGHEST_PROTOCOL)
 
 print('test now')
-test_feats = processImgList(testImgs,'./data/coco_align.test')
+test_feats = processImgList(testImgs,'/mnt/data/lblier/coco/processed/coco_align.test')
 with open('./data/coco_align.test.pkl', 'wb') as f:
     cPickle.dump(cap_test, f,protocol=cPickle.HIGHEST_PROTOCOL)
