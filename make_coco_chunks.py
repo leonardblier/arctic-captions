@@ -1,4 +1,3 @@
-from caffe_cnn import *
 import numpy as np
 import os
 import scipy
@@ -10,25 +9,31 @@ from pycocotools.coco import COCO
 from pycocoevalcap.eval import COCOEvalCap
 import requests
 
+from ..NeuralModels import convnet, preprocess_image
+
 #Create the CNN, using the 19 layers CNN
-vgg_deploy_path = 'VGG_ILSVRC_19_layers_deploy.prototxt'
-vgg_model_path  = 'VGG_ILSVRC_19_layers.caffemodel'
-cnn = CNN(deploy=vgg_deploy_path,
-          model=vgg_model_path,
-          batch_size=20,
-          width=224,
-          height=224)
+# vgg_deploy_path = 'VGG_ILSVRC_19_layers_deploy.prototxt'
+# vgg_model_path  = 'VGG_ILSVRC_19_layers.caffemodel'
+# cnn = CNN(deploy=vgg_deploy_path,
+#           model=vgg_model_path,
+#           batch_size=20,
+#           width=224,
+#           height=224)
+
+cnn, feature_layer = convnet('vgg_19',
+                             weight_path='/mnt/data/lblier/vgg19_weights.h5',
+                             output_layers=['conv5_4'])
 
 
 
 #Get filenames for training/testing. Put your own filenames here
-coco_image_path = '/usr0/multicomp/datasets/coco/images'
-tpath = '/usr0/multicomp/datasets/coco/images/train2014/'
-vpath = '/usr0/multicomp/datasets/coco/images/val2014/'
+coco_image_path = '/mnt/data/lblier/coco/'
+tpath = '/mnt/data/lblier/coco/train2014/'
+vpath = '/mnt/data/lblier/coco/val2014/'
 
 #Get train data from the training file. Put your own filenames here
-t_annFile = '/usr0/multicomp/datasets/coco/annotations/captions_train2014.json'
-v_annFile = '/usr0/multicomp/datasets/coco/annotations/captions_val2014.json'
+t_annFile = '/mnt/data/lblier/coco/annotations/captions_train2014.json'
+v_annFile = '/mnt/data/lblier/coco/annotations/captions_val2014.json'
 
 with open('./splits/coco_train.txt','r') as f:
     trainids = [x for x in f.read().splitlines()]
@@ -123,10 +128,17 @@ def processImgList(theList,basefn):
     numPics = 0
     batchNum = 0
 
-    for start, end in zip(range(0, len(theList)+100, 100), range(100, len(theList)+100, 100)):
+    for start, end in zip(range(0, len(theList)+batch_size, batch_size),
+                          range(batch_size, len(theList)+batch_size, batch_size)):
         print("processing images %d to %d" % (start, end))
         image_files = [getFilename(x) for x in theList[start:end]]
-        feat = cnn.get_features(image_list=image_files, layers='conv5_4', layer_sizes=[512,14,14])
+        # feat = cnn.get_features(image_list=image_files,
+        #                         layers='conv5_4',
+        #                         layer_sizes=[512,14,14])
+
+
+        imgs = [preprocess_image(x, 224, 224) for x in image_files]
+        feat = feature_layer(imgs)
         if numPics % batch_size == 0: #reset!
             featStacks = scipy.sparse.csr_matrix(np.array(map(lambda x: x.flatten(), feat)))
         else:
@@ -150,7 +162,6 @@ def processImgList(theList,basefn):
 
 print('train now')
 train_feats = processImgList(trainImgs,'./data/coco_align.train')
-
 with open('./data/coco_align.train.pkl', 'wb') as f:
     cPickle.dump(cap_train, f,protocol=cPickle.HIGHEST_PROTOCOL)
 
