@@ -103,17 +103,17 @@ def load_data(load_train=True, load_dev=True, load_test=True, path='./data/coco/
 
     if load_train:
 
-        with open('./data/coco_align.train.pkl', 'rb') as f:
+        with open('/data/coco/processed/coco_align.train.pkl', 'rb') as f:
             train_cap = pkl.load(f)
             #train_feat = pkl.load(f)
 
-        with open('./data/coco_align.train0.pkl', 'rb') as f:
+        with open('/data/coco/processed/coco_align.train0.pkl', 'rb') as f:
             train_feat = pkl.load(f)
             train_feat = train_feat.tocsr()
         print "trainfeat", train_feat.shape
         for t in range(1,num_trains):
 
-            with open('./data/coco_align.train' + str(t) + '.pkl', 'rb') as f:
+            with open('/data/coco/processed/coco_align.train' + str(t) + '.pkl', 'rb') as f:
                 tempfeat = pkl.load(f)
             tempfeat = tempfeat.tocsr()
             print "tempfeat", tempfeat.shape
@@ -121,15 +121,15 @@ def load_data(load_train=True, load_dev=True, load_test=True, path='./data/coco/
         train = (train_cap, train_feat)
 
     if load_dev:
-        with open('./data/coco_align.val.pkl', 'rb') as f:
+        with open('/data/coco/processed/coco_align.val.pkl', 'rb') as f:
             dev_cap = pkl.load(f)
             #dev_feat = pkl.load(f)
 
-        with open('./data/coco_align.val0.pkl', 'rb') as f:
+        with open('/data/coco/processed/coco_align.val0.pkl', 'rb') as f:
             dev_feat = pkl.load(f)
         dev_feat = dev_feat.tocsr()
         for t in range(1,num_devs):
-            with open('./data/coco_align.val' + str(t) + '.pkl', 'rb') as f:
+            with open('/data/coco/processed/coco_align.val' + str(t) + '.pkl', 'rb') as f:
                 tempfeat = pkl.load(f)
             tempfeat = tempfeat.tocsr()
             dev_feat = scipy.sparse.vstack([dev_feat, tempfeat],format="csr")
@@ -137,23 +137,23 @@ def load_data(load_train=True, load_dev=True, load_test=True, path='./data/coco/
         valid = (dev_cap, dev_feat)
 
     if load_test:
-        with open('./data/coco_align.test.pkl', 'rb') as f:
+        with open('/data/coco/processed/coco_align.test.pkl', 'rb') as f:
             test_cap = pkl.load(f)
             #test_feat = pkl.load(f)
         
-        with open('./data/coco_align.test0.pkl', 'rb') as f:
+        with open('/data/coco/processed/coco_align.test0.pkl', 'rb') as f:
             test_feat = pkl.load(f)
         test_feat = test_feat.tocsr()
 
         for t in range(1,num_tests):
-            with open('./data/coco_align.test' + str(t) + '.pkl', 'rb') as f:
+            with open('/data/coco/processed/coco_align.test' + str(t) + '.pkl', 'rb') as f:
                 tempfeat = pkl.load(f)
             tempfeat = tempfeat.tocsr()
             test_feat = scipy.sparse.vstack([test_feat, tempfeat],format="csr")
 
         test = (test_cap, test_feat)
 
-    with open(path+'coco_dictionary.pkl', 'rb') as f:
+    with open('/data/coco/processed/coco_dictionary.pkl', 'rb') as f:
         worddict = pkl.load(f)
 
 

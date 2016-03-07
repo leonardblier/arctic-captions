@@ -1,3 +1,8 @@
+import theano
+#theano.config.device = 'gpu'
+theano.config.floatX = 'float32'
+
+
 import numpy as np
 import os
 import scipy
@@ -5,32 +10,35 @@ import json
 import cPickle
 from sklearn.feature_extraction.text import CountVectorizer
 import pdb
-from pycocotools.coco import COCO
-from pycocoevalcap.eval import COCOEvalCap
+
+
+
 import requests
 
 import sys
 sys.path.insert(0, "../")
 from NeuralModels.convnets import convnet, preprocess_image_batch
+from CocoCap.pycocotools.coco import COCO
+from CocoCap.pycocoevalcap.eval import COCOEvalCap
 
 import pdb
 
 
 
 cnn, feature_layer = convnet('vgg_19',
-                             weights_path='/mnt/data/lblier/vgg19_weights.h5',
+                             weights_path='/data/vgg19_weights.h5',
                              output_layers=['conv5_4'])
 
 
 
 #Get filenames for training/testing. Put your own filenames here
-coco_image_path = '/mnt/data/lblier/coco/'
-tpath = '/mnt/data/lblier/coco/train2014/'
-vpath = '/mnt/data/lblier/coco/val2014/'
+coco_image_path = '/data/coco/'
+tpath = '/data/coco/train2014/'
+vpath = '/data/coco/val2014/'
 
 #Get train data from the training file. Put your own filenames here
-t_annFile = '/mnt/data/lblier/coco/annotations/captions_train2014.json'
-v_annFile = '/mnt/data/lblier/coco/annotations/captions_val2014.json'
+t_annFile = '/data/coco/annotations/captions_train2014.json'
+v_annFile = '/data/coco/annotations/captions_val2014.json'
 
 with open('./splits/coco_train.txt','r') as f:
     trainids = [x for x in f.read().splitlines()]
@@ -121,12 +129,13 @@ def getFilename(imgobj):
 
 #Processes the CNN features
 def processImgList(theList,basefn):
-    batch_size = 100
+    batch_size_img = 16
+    batch_size_file = 100
     numPics = 0
     batchNum = 0
 
-    for start, end in zip(range(0, len(theList)+batch_size, batch_size),
-                          range(batch_size, len(theList)+batch_size, batch_size)):
+    for start, end in zip(range(0, len(theList)+batch_size_img, batch_size_img),
+                          range(batch_size_img, len(theList)+batch_size_img, batch_size_img)):
         
         print("processing images %d to %d" % (start, end))
         image_files = [getFilename(x) for x in theList[start:end]]
@@ -137,7 +146,7 @@ def processImgList(theList,basefn):
 
         imgs = preprocess_image_batch(image_files, 224, 224)
         feat = feature_layer([imgs])
-        if numPics % batch_size == 0: #reset!
+        if numPics % batch_size_file == 0: #reset!
             featStacks = scipy.sparse.csr_matrix(np.array(map(lambda x: x.flatten(), feat)))
         else:
             featStacks = scipy.sparse.vstack([featStacks,
@@ -146,31 +155,59 @@ def processImgList(theList,basefn):
         
         numPics += 1
 
-        if numPics % batch_size == 0:
+        if numPics % batch_size_file == 0:
             newfn = basefn + str(batchNum) + '.pkl'
             with open(newfn,'wb') as f:
                 cPickle.dump(featStacks, f,protocol=cPickle.HIGHEST_PROTOCOL)
                 print("Success!")
             batchNum += 1
 
-    if numPics % batch_size != 0:
+    if numPics % batch_size_file != 0:
         newfn = basefn + str(batchNum) + '.pkl'
         with open(newfn,'wb') as f:
             cPickle.dump(featStacks, f,protocol=cPickle.HIGHEST_PROTOCOL)
     return featStacks
 
 
-print('train now')
-train_feats = processImgList(trainImgs,'/mnt/data/lblier/coco/processed/coco_align.train')
-with open('./data/coco_align.train.pkl', 'wb') as f:
-    cPickle.dump(cap_train, f,protocol=cPickle.HIGHEST_PROTOCOL)
+# print('train now')
+# try:
+#     train_feats = processImgList(trainImgs,'/data/coco/processed/coco_align.train')
+# except:
+#     pass
+# with open('/data/coco/processed/coco_align.train.pkl', 'wb') as f:
+#     cPickle.dump(cap_train, f,protocol=cPickle.HIGHEST_PROTOCOL)
 
-print('val now')
-val_feats = processImgList(valImgs,'/mnt/data/lblier/coco/processed/coco_align.val')
-with open('./data/coco_align.val.pkl', 'wb') as f:
-    cPickle.dump(cap_val, f,protocol=cPickle.HIGHEST_PROTOCOL)
+# print('val now')
+# try:
+#     val_feats = processImgList(valImgs,'/data/coco/processed/coco_align.val')
+# except:
+#     pass
+# with open('/data/coco/processed/coco_align.val.pkl', 'wb') as f:
+#     cPickle.dump(cap_val, f,protocol=cPickle.HIGHEST_PROTOCOL)
 
-print('test now')
-test_feats = processImgList(testImgs,'/mnt/data/lblier/coco/processed/coco_align.test')
-with open('./data/coco_align.test.pkl', 'wb') as f:
-    cPickle.dump(cap_test, f,protocol=cPickle.HIGHEST_PROTOCOL)
+# print('test now')
+# try:
+#     test_feats = processImgList(testImgs,'/data/coco/processed/coco_align.test')
+# except:
+#     pass
+# with open('/data/coco/processed/coco_align.test.pkl', 'wb') as f:
+#     cPickle.dump(cap_test, f,protocol=cPickle.HIGHEST_PROTOCOL)
+
+
+
+
+## MAKE THE DICTIONNARY
+worddict = {}
+with open('/data/coco/processed/coco_align.train.pkl', 'rb') as f:
+    trainset = cPickle.load(f)
+
+count = 2
+for cap in trainset:
+    words = cap[0].split()
+    for w in words:
+        if not w in worddict:
+            worddict[w] = count
+            count += 1
+
+with open('/data/coco/processed/coco_dictionary.pkl', 'wb') as f:
+    cPickle.dump(worddict, f,protocol=cPickle.HIGHEST_PROTOCOL)
